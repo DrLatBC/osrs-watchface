@@ -143,10 +143,10 @@ WatchFace({
       setImage(minOnes, `images/big/${m % 10}.png`, t.minute_x + D, t.y)
       setImage(ampm, twelve ? `images/ampm/${h < 12 ? 'am' : 'pm'}.png` : '', t.ampm_x, t.ampm_y)
 
-      // "Fri, 30-10-2026" then the seconds, centred as one line.
+      // "Fri, 10-30-2026" then the seconds, centred as one line.
       const d = LAYOUT.date
       const week = `images/week/${time.getDay() - 1}.png`
-      const date = digits('cream', `${pad2(time.getDate())}-${pad2(time.getMonth())}-${time.getFullYear()}`)
+      const date = digits('cream', `${pad2(time.getMonth())}-${pad2(time.getDate())}-${time.getFullYear()}`)
       const dateW = date.reduce((sum, src) => sum + widthOf(src), 0)
       const secsW = 2 * widthOf('images/cream/0.png')
       const full = widthOf(week) + d.space + dateW + (secsRun ? d.secs_gap + secsW : 0)

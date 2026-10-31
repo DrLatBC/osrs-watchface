@@ -438,7 +438,7 @@ def mockup(bg, s):
 
     c = s["cream"]
     day = s["week"][4]
-    date = [c["3"], c["0"], c["-"], c["1"], c["0"], c["-"], c["2"], c["0"], c["2"], c["6"]]
+    date = [c["1"], c["0"], c["-"], c["3"], c["0"], c["-"], c["2"], c["0"], c["2"], c["6"]]
     secs = [c["3"], c["3"]]
     space, secs_gap = 3 * P, 8 * P
     full = day.width + space + row_width(date) + secs_gap + row_width(secs)
