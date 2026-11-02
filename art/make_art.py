@@ -255,6 +255,15 @@ LAYOUT = {
     "battery": {"cy": CENTER + DISC_R + len(PIPE) * P / 2},
 }
 
+# Tapping the globe orb or its temperature plate opens the weather app.
+_globe, _globe_plate = LAYOUT["orbs"]["globe"], LAYOUT["plates"]["globe"]
+LAYOUT["tap"] = {"globe": {
+    "x": int(_globe["cx"] - ORB_HALF),
+    "y": int(_globe["cy"] - ORB_HALF),
+    "w": int(_globe_plate["x"] + _globe_plate["w"] - (_globe["cx"] - ORB_HALF)),
+    "h": 2 * ORB_HALF,
+}}
+
 
 def check_fit():
     """Every plate's text must sit inside the round screen with a margin."""
@@ -369,6 +378,8 @@ def build_sprites():
         s["fills"][key] = [save(im, f"orbs/{key}/{i}.png") for i, im in enumerate(orb_fills(name))]
     s["globe"] = sprite("World_map_icon.png")
     s["compass"] = [save(im, f"compass/{i}.png") for i, im in enumerate(compass_frames())]
+    t = LAYOUT["tap"]["globe"]
+    save(Image.new("RGBA", (t["w"], t["h"]), (0, 0, 0, 0)), "tap/globe.png")
     # The potion is drawn at 1x so it fits a plaque the height of the orb plates.
     s["potion"] = sprite("potions/Antipoison(4).png", scale=1)
     return s

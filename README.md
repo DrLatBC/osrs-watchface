@@ -4,12 +4,18 @@ An Old School RuneScape face for the Amazfit Active 2 (Round, 466x466, Zepp OS 4
 installed through Gadgetbridge. Personal use only; not published anywhere.
 
 - **Orbs** (official in-game sprites) fill from the bottom in 5% steps:
-  - HP: last heart rate. Full at resting HR, empty at 220 - age.
+  - HP: heart rate, measured live while the screen is on (the watch's last
+    background reading until the first live one). Full at resting HR, empty at
+    220 - age.
   - Prayer: SpO2. Empty at 85%, full at 100%.
   - Run: steps toward the daily step goal.
-  - World map: current temperature (needs Gadgetbridge to send weather).
+  - World map: current temperature. Tapping it or its plate opens the watch's
+    Weather app. Weather comes from Breezy Weather on the phone (Settings ->
+    External modules -> Gadgetbridge); Gadgetbridge has no network access of its own.
 - **Compass** (official minimap sprite) on top of the ring turns so N points north;
-  left out if the watch won't give a face the compass.
+  left out if the watch won't give a face the compass. While awake it runs at the
+  high report rate and is also polled every 200 ms; an uncalibrated compass
+  ('INVALID') holds the last heading.
 - **Time** in the OSRS Bold-12 font, everything else in Plain-11. 12h shows am/pm
   with no leading zero; 24h is zero-padded.
 - **Always-on**: time and date only, on black.
@@ -47,8 +53,12 @@ Active 2 Round values are in `app.json`). Don't use the Zepp app.
   `@zos/user`. An exception in `build()` is swallowed into a black screen, so every
   platform call is guarded.
 - Sensors throw without their `app.json` permission.
-- `HeartRate.getCurrent()` reads 0 on the watch; use `getLast()`.
+- `HeartRate.getCurrent()` only has a value inside an `onCurrentChange` callback,
+  which starts continuous measurement until `offCurrentChange`. `getLast()` is the
+  background reading and never includes live results.
 - `BloodOxygen.getCurrent()` stays empty even after a manual reading; the face falls
   back to `getLastFewHour()` and `getLastDay()`.
+- `IMG_CLICK` with a `data_type` opens that system app on a tap; it needs a `src`,
+  so the globe's tap area is a transparent `images/tap/globe.png`.
 - Image digits need fixed-width cells, and an `IMG` can't be scaled: its w/h must
   match the file.

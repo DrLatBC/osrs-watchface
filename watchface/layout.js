@@ -101,6 +101,14 @@ export const LAYOUT = {
       "w": 66,
       "y": 384
     }
+  },
+  "tap": {
+    "globe": {
+      "x": 290,
+      "y": 297,
+      "w": 140,
+      "h": 68
+    }
   }
 }
 
@@ -652,6 +660,10 @@ export const SIZES = {
   "images/preview.png": [
     314,
     314
+  ],
+  "images/tap/globe.png": [
+    140,
+    68
   ],
   "images/week/0.png": [
     50,

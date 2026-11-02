@@ -222,6 +222,23 @@ WatchFace({
         : null
     if (!weatherWidget) weatherRun = textRun(2, NORMAL)
 
+    // A weather data type on IMG_CLICK makes the firmware open its weather
+    // app on a tap. The image is transparent and covers the orb and plate.
+    const tap = LAYOUT.tap.globe
+    if (hmUI.widget.IMG_CLICK !== undefined && weatherType !== undefined) {
+      guard(() =>
+        hmUI.createWidget(hmUI.widget.IMG_CLICK, {
+          x: tap.x,
+          y: tap.y,
+          w: tap.w,
+          h: tap.h,
+          src: 'images/tap/globe.png',
+          type: weatherType,
+          show_level: NORMAL,
+        }),
+      )
+    }
+
     const spo2 = (v) => (typeof v === 'number' && v > 50 && v <= 100 ? v : null)
 
     // The newest SpO2 the watch has, or null. getCurrent() stays empty on
@@ -256,13 +273,29 @@ WatchFace({
       plates[key].show(digits('green', text), box)
     }
 
-    function drawStats() {
-      // HP: full at resting heart rate, empty at 220 - age.
-      const hr = reading(call(heart, 'getLast')) || reading(call(heart, 'getCurrent'))
+    // While awake the face runs continuous heart rate measurement; until
+    // its first result, and when the firmware refuses it, the watch's last
+    // background reading shows instead.
+    let liveHr = null
+
+    function onLiveHr() {
+      const v = reading(call(heart, 'getCurrent'))
+      if (v === null) return
+      liveHr = v
+      drawHeart()
+    }
+
+    // HP: full at resting heart rate, empty at 220 - age.
+    function drawHeart() {
+      const hr = liveHr || reading(call(heart, 'getLast'))
       const rest = reading(call(heart, 'getResting'))
       const max = age ? 220 - age : null
       plate('hp', hr === null ? '--' : Math.round(hr))
       setOrb('hp', hr !== null && rest !== null && max !== null && max > rest ? 1 - (hr - rest) / (max - rest) : null)
+    }
+
+    function drawStats() {
+      drawHeart()
 
       // Prayer: SpO2, empty at 85% and full at 100%.
       const ox = readSpo2()
@@ -294,15 +327,26 @@ WatchFace({
     const compassSrc = (frame) => `images/compass/${frame}.png`
     const half = SIZES[compassSrc(0)][0] / 2
     let compassWidget = compass ? image(compassSrc(0), cp.cx - half, cp.cy - half, NORMAL) : null
+    let compassFrame = 0
 
+    // An uncalibrated compass reads 'INVALID'; the dial holds its last
+    // heading rather than snapping to north.
     function drawCompass() {
       if (!compassWidget) return
       const angle = call(compass, 'getDirectionAngle')
-      const frame = typeof angle === 'number' ? Math.round(angle / (360 / COMPASS_STEPS)) % COMPASS_STEPS : 0
+      if (typeof angle !== 'number' || !isFinite(angle)) return
+      const frame = Math.round(angle / (360 / COMPASS_STEPS)) % COMPASS_STEPS
+      if (frame === compassFrame) return
+      compassFrame = frame
       setImage(compassWidget, compassSrc(frame), cp.cx - half, cp.cy - half)
     }
 
     if (compass) call(compass, 'onChange', drawCompass)
+
+    // onChange alone can go quiet, so the dial is also polled while awake.
+    const COMPASS_POLL_MS = 200
+    const FREQ_HIGH = guard(() => sensor.FREQ_MODE_HIGH ?? (compass ? compass.FREQ_MODE_HIGH : undefined), undefined)
+    let compassPoll = null
 
     let ticker = null
     function tick() {
@@ -312,6 +356,7 @@ WatchFace({
 
     hmUI.createWidget(hmUI.widget.WIDGET_DELEGATE, {
       resume_call: () => {
+        call(heart, 'onCurrentChange', onLiveHr)
         drawClock()
         drawStats()
         drawSeconds()
@@ -319,7 +364,11 @@ WatchFace({
           setImage(compassWidget, '', cp.cx, cp.cy)
           compassWidget = null
         }
-        drawCompass()
+        if (compassWidget) {
+          if (FREQ_HIGH !== undefined) call(compass, 'setFreqMode', FREQ_HIGH)
+          drawCompass()
+          if (compassPoll === null) compassPoll = setInterval(drawCompass, COMPASS_POLL_MS)
+        }
         if (ticker === null) ticker = setInterval(tick, 1000)
       },
       pause_call: () => {
@@ -327,12 +376,18 @@ WatchFace({
           clearInterval(ticker)
           ticker = null
         }
+        if (compassPoll !== null) {
+          clearInterval(compassPoll)
+          compassPoll = null
+        }
         if (compassWidget) call(compass, 'stop')
+        call(heart, 'offCurrentChange', onLiveHr)
+        liveHr = null
       },
     })
 
     drawStats()
-    call(heart, 'onLastChange', drawStats)
+    call(heart, 'onLastChange', drawHeart)
   },
 
   onInit() {},
