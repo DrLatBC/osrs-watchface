@@ -3,7 +3,7 @@ import * as zapp from '@zos/app'
 import * as sensor from '@zos/sensor'
 import * as user from '@zos/user'
 
-import { CENTER, FILL_STEPS, COMPASS_STEPS, LAYOUT, SIZES } from './layout.js'
+import { CENTER, FILL_STEPS, COMPASS_STEPS, MOON_PHASES, LAYOUT, SIZES } from './layout.js'
 
 // This firmware has no hmUI/hmSensor globals, and an exception thrown in
 // build() is swallowed into a black screen. So every platform call that
@@ -60,7 +60,12 @@ function setImage(widget, src, x, y) {
   widget.setProperty(hmUI.prop.MORE, { x, y, w, h, src })
 }
 
-const GLYPH_NAMES = { '-': { green: 'minus', cream: 'dash' }, '°': { green: 'degree' }, '%': { white: 'percent' } }
+const GLYPH_NAMES = {
+  '-': { green: 'minus', cream: 'dash' },
+  ':': { gold: 'colon', dusk: 'colon' },
+  '°': { green: 'degree' },
+  '%': { white: 'percent' },
+}
 
 function glyph(set, ch) {
   const name = GLYPH_NAMES[ch] ? GLYPH_NAMES[ch][set] : ch
@@ -175,6 +180,105 @@ WatchFace({
     const step = make('Step')
     const battery = make('Battery')
     const age = reading(guard(() => user.getProfile().age))
+
+    // Sky: the sun runs along the top of the ring from sunrise (9 o'clock)
+    // to sunset (3 o'clock) and the moon along the bottom through the night,
+    // each at the pace of that day's daylight or darkness. The glows sit
+    // under them and the orbs, plates, compass and plaque over them, so
+    // whatever hides the body lights up around its edges instead. The times
+    // come from the forecast Gadgetbridge sends; without them the sky stays
+    // empty. These widgets are created first so everything else layers on top.
+    const sky = LAYOUT.sky
+    const weather = make('Weather')
+    const glows = {}
+    for (const key of Object.keys(sky.glows)) glows[key] = image('', 0, 0, NORMAL)
+    const sunWidget = image('', 0, 0, NORMAL)
+    const moonWidget = image('', 0, 0, NORMAL)
+    for (const [src, x, y] of sky.over) image(src, x, y, NORMAL)
+    const riseRun = textRun(4, NORMAL)
+    const setRun = textRun(4, NORMAL)
+    const riseIcon = image('', 0, 0, NORMAL)
+    const setIcon = image('', 0, 0, NORMAL)
+
+    // art/make_art.py has the same track.
+    function track(body, a) {
+      const r = (a * Math.PI) / 180
+      return body === 'sun'
+        ? [sky.cx - sky.r * Math.cos(r), sky.cy - sky.r * Math.sin(r)]
+        : [sky.cx + sky.r * Math.cos(r), sky.cy + sky.r * Math.sin(r)]
+    }
+
+    const minuteOf = (t) =>
+      t && typeof t.hour === 'number' && typeof t.minute === 'number' ? t.hour * 60 + t.minute : null
+
+    // Today's sunrise and sunset and tomorrow's sunrise, in minutes after midnight.
+    function readSun() {
+      const forecast = call(weather, 'getForecast')
+      const days = forecast && forecast.tideData && forecast.tideData.data
+      if (!Array.isArray(days) || !days[0]) return null
+      const rise = minuteOf(days[0].sunrise)
+      const set = minuteOf(days[0].sunset)
+      if (rise === null || set === null || rise >= set) return null
+      const next = days[1] ? minuteOf(days[1].sunrise) : null
+      return { rise, set, nextRise: next === null ? rise : next }
+    }
+
+    // How far through its 29.53-day cycle the moon is, counted from a known
+    // new moon, as one of the MOON_PHASES images.
+    const SYNODIC_DAYS = 29.530588853
+    const NEW_MOON_MS = Date.UTC(2000, 0, 6, 18, 14)
+    function moonPhase() {
+      const now = guard(() => Date.now())
+      if (typeof now !== 'number') return MOON_PHASES / 2
+      const days = (now - NEW_MOON_MS) / 86400000
+      const p = (((days % SYNODIC_DAYS) + SYNODIC_DAYS) % SYNODIC_DAYS) / SYNODIC_DAYS
+      return Math.round(p * MOON_PHASES) % MOON_PHASES
+    }
+
+    const hm12 = (m) => `${Math.floor(m / 60) % 12 || 12}:${pad2(m % 60)}`
+
+    function drawSky() {
+      const sun = time ? readSun() : null
+      let body = null
+      let a = 0
+      if (sun) {
+        const m = time.getHours() * 60 + time.getMinutes()
+        if (m >= sun.rise && m < sun.set) {
+          body = 'sun'
+          a = (180 * (m - sun.rise)) / (sun.set - sun.rise)
+        } else {
+          const start = m >= sun.set ? sun.set : sun.set - 1440
+          const end = m >= sun.set ? sun.nextRise + 1440 : sun.rise
+          body = 'moon'
+          a = (180 * (m - start)) / (end - start)
+        }
+      }
+      riseRun.show(sun ? digits('gold', hm12(sun.rise)) : [], sky.rise)
+      setRun.show(sun ? digits('dusk', hm12(sun.set)) : [], sky.set)
+      setImage(riseIcon, sun ? 'images/sky/rise.png' : '', sky.rise.icon[0], sky.rise.icon[1])
+      setImage(setIcon, sun ? 'images/sky/set.png' : '', sky.set.icon[0], sky.set.icon[1])
+
+      const [x, y] = body ? track(body, a) : [0, 0]
+      const bx = Math.round(x - sky.half)
+      const by = Math.round(y - sky.half)
+      setImage(sunWidget, body === 'sun' ? 'images/sky/sun.png' : '', bx, by)
+      setImage(moonWidget, body === 'moon' ? `images/sky/moon/${moonPhase()}.png` : '', bx, by)
+
+      for (const key of Object.keys(glows)) {
+        const g = sky.glows[key]
+        let src = ''
+        let at = [0, 0]
+        // Without a compass on the face nothing hides the sun at midday.
+        if (body === g.body && a >= g.a0 && a <= g.a1 && (key !== 'compass' || compassWidget)) {
+          const i = Math.round(((a - g.a0) / (g.a1 - g.a0)) * (g.frames.length - 1))
+          if (g.frames[i]) {
+            src = `images/glow/${key}/${i}.png`
+            at = g.frames[i]
+          }
+        }
+        setImage(glows[key], src, at[0], at[1])
+      }
+    }
 
     const orbs = {}
     for (const key of ['hp', 'prayer', 'run']) {
@@ -351,7 +455,10 @@ WatchFace({
     let ticker = null
     function tick() {
       drawSeconds()
-      if (time && time.getSeconds() % 30 === 0) drawStats()
+      if (time && time.getSeconds() % 30 === 0) {
+        drawStats()
+        drawSky()
+      }
     }
 
     hmUI.createWidget(hmUI.widget.WIDGET_DELEGATE, {
@@ -369,6 +476,7 @@ WatchFace({
           drawCompass()
           if (compassPoll === null) compassPoll = setInterval(drawCompass, COMPASS_POLL_MS)
         }
+        drawSky()
         if (ticker === null) ticker = setInterval(tick, 1000)
       },
       pause_call: () => {
@@ -387,6 +495,7 @@ WatchFace({
     })
 
     drawStats()
+    drawSky()
     call(heart, 'onLastChange', drawHeart)
   },
 

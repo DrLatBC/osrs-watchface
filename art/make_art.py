@@ -12,6 +12,7 @@ import math
 import random
 from pathlib import Path
 
+import numpy as np
 from PIL import Image
 
 import osrs_font
@@ -26,6 +27,8 @@ CREAM = (242, 227, 179, 255)
 GREEN = (62, 240, 62, 255)
 WHITE = (255, 255, 255, 255)
 BLACK = (0, 0, 0, 255)
+GOLD = (255, 214, 64, 255)   # sunrise time
+DUSK = (255, 140, 32, 255)   # sunset time
 
 # Screen pixels per game pixel. Sprites, plates and small text share 2x so
 # orbs and their numbers keep their in-game proportions; the time is 6x.
@@ -265,14 +268,35 @@ LAYOUT["tap"] = {"globe": {
 }}
 
 
+# Sunrise and sunset times sit in the stonework just outside the ring's 9 and
+# 3 o'clock joints, each against its joint, with a horizon icon centred above.
+TRACK_R = DISC_R + len(PIPE) * P / 2  # the pipe's centre line
+LABEL_W = 3 * SMALL_DIGIT_W + small(":", CREAM).width  # "h:mm" fills the box exactly
+HORIZON_W, HORIZON_H = 13, 12  # icon ink, game pixels; the shadow adds one each way
+_joint_out = CENTER - TRACK_R - KNOB_R * P
+_label_y = int(CENTER - SMALL_INK_H / 2)
+LAYOUT["sky"] = {
+    "rise": {"x": int(_joint_out - 2 * P - LABEL_W), "y": _label_y, "w": LABEL_W, "align": "right"},
+    "set": {"x": int(SIZE - _joint_out + 2 * P), "y": _label_y, "w": LABEL_W, "align": "left"},
+}
+for _box in LAYOUT["sky"].values():
+    _iw, _ih = (HORIZON_W + 1) * P, (HORIZON_H + 1) * P
+    _box["icon"] = [int(_box["x"] + (_box["w"] - _iw) / 2), _label_y - _ih - P]
+
+
 def check_fit():
-    """Every plate's text must sit inside the round screen with a margin."""
-    for key, p in LAYOUT["plates"].items():
-        t = p["text"]
-        for x in (t["x"], t["x"] + t["w"]):
-            for y in (t["y"], t["y"] + SMALL_INK_H):
+    """Every plate's text and the sky labels and icons must sit inside the
+    round screen with a margin."""
+    boxes = {k: (p["text"]["x"], p["text"]["y"], p["text"]["w"], SMALL_INK_H) for k, p in LAYOUT["plates"].items()}
+    for key in ("rise", "set"):
+        b = LAYOUT["sky"][key]
+        boxes[key] = (b["x"], b["y"], b["w"], SMALL_INK_H)
+        boxes[key + " icon"] = (*b["icon"], (HORIZON_W + 1) * P, (HORIZON_H + 1) * P)
+    for key, (bx, by, bw, bh) in boxes.items():
+        for x in (bx, bx + bw):
+            for y in (by, by + bh):
                 r = math.hypot(x - CENTER, y - CENTER)
-                assert r < CENTER - 6, f"{key} text corner ({x},{y}) is {r:.0f} px from centre"
+                assert r < CENTER - 6, f"{key} corner ({x},{y}) is {r:.0f} px from centre"
 
 
 # ---------------------------------------------------------------- orb fills
@@ -347,6 +371,255 @@ def compass_frames():
     return out
 
 
+# ---------------------------------------------------------------- sky
+
+BODY = 17             # sun and moon, game pixels across
+BODY_HALF = BODY * P // 2
+MOON_PHASES = 8       # new, waxing crescent, first quarter, ... waning crescent
+GLOW_FRAMES = 12      # per thing the sun or moon passes behind
+GLOW_W = 14           # screen pixels the light reaches past an edge, at the tip of a sun ray
+GLOW_REACH = 72       # screen pixels past the body's rim where the light fades out
+SUN_RAYS = 16
+GLOW_ALPHA = [0, 120, 170, 215, 255]  # by level, 0 = none
+LIGHT = {  # level 4 first
+    "sun": [(255, 250, 200), (255, 232, 120), (255, 200, 70), (240, 160, 40)],
+    "moon": [(240, 244, 255), (210, 222, 255), (176, 194, 245), (140, 160, 225)],
+}
+
+
+def track(body, a):
+    """Screen position a degrees along the body's half of the ring: the sun
+    runs 9 -> 12 -> 3 o'clock from sunrise to sunset, the moon 3 -> 6 -> 9
+    from sunset to sunrise. watchface/index.js has the same function."""
+    t = math.radians(a)
+    if body == "sun":
+        return CENTER - TRACK_R * math.cos(t), CENTER - TRACK_R * math.sin(t)
+    return CENTER + TRACK_R * math.cos(t), CENTER + TRACK_R * math.sin(t)
+
+
+def js_round(v):
+    return math.floor(v + 0.5)
+
+
+def body_xy(body, a):
+    """Top-left of the body's image, rounded the way the face rounds it."""
+    x, y = track(body, a)
+    return js_round(x - BODY_HALF), js_round(y - BODY_HALF)
+
+
+def sun_sprite():
+    c = BODY / 2
+    img = Image.new("RGBA", (BODY, BODY), (0, 0, 0, 0))
+    px = img.load()
+    for y in range(BODY):
+        for x in range(BODY):
+            dx, dy = x + 0.5 - c, y + 0.5 - c
+            d = math.hypot(dx, dy)
+            if d > c:
+                continue
+            if d > c - 1:
+                col = (120, 56, 8)
+            else:
+                i = -0.45 * dx / c - 0.5 * dy / c
+                col = (255, 240, 150) if i > 0.3 else (255, 206, 64) if i > -0.2 else (236, 150, 28)
+            px[x, y] = col + (255,)
+    return img.resize((BODY * P, BODY * P), Image.NEAREST)
+
+
+HORIZON_SUN = {  # light to dark
+    "rise": [(255, 240, 150), (255, 206, 64), (236, 150, 28)],
+    "set": [(255, 200, 120), (255, 140, 40), (210, 80, 24)],
+}
+
+
+def horizon_icon(key):
+    """A half sun on the horizon under an arrow, up for sunrise and down for
+    sunset, with the OSRS one-pixel black shadow."""
+    w, h = HORIZON_W, HORIZON_H
+    ink = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    px = ink.load()
+    head = [[6], [5, 6, 7], [4, 5, 6, 7, 8], [3, 4, 5, 6, 7, 8, 9]]
+    arrow = head + [[6]] if key == "rise" else [[6]] + head[::-1]
+    for y, xs in enumerate(arrow):
+        for x in xs:
+            px[x, y] = CREAM
+    pal = HORIZON_SUN[key]
+    for y in range(6, 11):
+        for x in range(w):
+            d = math.hypot(x + 0.5 - 6.5, y + 0.5 - 11)
+            if d <= 4.6:
+                px[x, y] = (pal[0] if d < 2.4 else pal[1] if d < 3.7 else pal[2]) + (255,)
+    for x, y in ((0, 9), (1, 9), (11, 9), (12, 9), (2, 6), (10, 6)):
+        px[x, y] = pal[1] + (255,)
+    for x in range(w):
+        px[x, h - 1] = CREAM
+    out = Image.new("RGBA", (w + 1, h + 1), (0, 0, 0, 0))
+    out.paste(Image.new("RGBA", (w, h), BLACK), (1, 1), ink)
+    out.alpha_composite(ink)
+    return out.resize((out.width * P, out.height * P), Image.NEAREST)
+
+
+MOON_CRATERS ={(5, 5), (6, 5), (5, 6), (10, 8), (11, 8), (11, 9), (5, 11), (9, 13), (10, 13), (12, 4)}
+
+
+def moon_phases():
+    """The moon lit as seen from the northern hemisphere: frame k is k/8 of
+    the way from one new moon to the next, full at 4."""
+    c = BODY / 2
+    out = []
+    for k in range(MOON_PHASES):
+        p = k / MOON_PHASES
+        img = Image.new("RGBA", (BODY, BODY), (0, 0, 0, 0))
+        px = img.load()
+        for y in range(BODY):
+            for x in range(BODY):
+                dx, dy = x + 0.5 - c, y + 0.5 - c
+                d = math.hypot(dx, dy)
+                if d > c:
+                    continue
+                if d > c - 1:
+                    col = (20, 22, 30)
+                else:
+                    w = math.sqrt(max(0.0, 1 - (dy / c) ** 2))
+                    edge = w * math.cos(2 * math.pi * p)
+                    u = dx / c
+                    lit = u > edge if p < 0.5 else u < -edge
+                    if lit:
+                        col = (190, 190, 180) if (x, y) in MOON_CRATERS else (228, 228, 216)
+                    else:
+                        col = (74, 80, 104)
+                px[x, y] = col + (255,)
+        out.append(img.resize((BODY * P, BODY * P), Image.NEAREST))
+    return out
+
+
+def alpha_mask(im, x, y):
+    m = np.zeros((SIZE, SIZE), bool)
+    a = np.array(im)[:, :, 3] > 0
+    x0, y0 = max(0, x), max(0, y)
+    x1, y1 = min(SIZE, x + im.width), min(SIZE, y + im.height)
+    m[y0:y1, x0:x1] = a[y0 - y:y1 - y, x0 - x:x1 - x]
+    return m
+
+
+def shifted(m, dx, dy):
+    """out[y, x] = m[y + dy, x + dx], False off the edge."""
+    out = np.zeros_like(m)
+    h, w = m.shape
+    out[max(0, -dy):h - max(0, dy), max(0, -dx):w - max(0, dx)] = \
+        m[max(0, dy):h - max(0, -dy), max(0, dx):w - max(0, -dx)]
+    return out
+
+
+def edge_distance(mask):
+    """Distance from each pixel to the nearest masked pixel, up to GLOW_W."""
+    e = np.full(mask.shape, np.inf)
+    e[mask] = 0
+    for dy in range(-GLOW_W, GLOW_W + 1):
+        for dx in range(-GLOW_W, GLOW_W + 1):
+            r = math.hypot(dx, dy)
+            if 0 < r <= GLOW_W:
+                e = np.where(shifted(mask, dx, dy), np.minimum(e, r), e)
+    return e
+
+
+def occluders(s):
+    """What the sun and moon pass behind, as screen masks: each orb with its
+    plate, the compass and the battery plaque."""
+    def placed(im, cx, cy):
+        return alpha_mask(im, int(cx - im.width / 2), int(cy - im.height / 2))
+
+    groups = {}
+    for key, body in (("hp", "sun"), ("prayer", "sun"), ("run", "moon"), ("globe", "moon")):
+        o, p = LAYOUT["orbs"][key], LAYOUT["plates"][key]
+        im = s["globe"] if key == "globe" else s["fills"][key][FILL_STEPS]
+        m = placed(im, o["cx"], o["cy"])
+        m[p["y"]:p["y"] + p["h"], p["x"]:p["x"] + p["w"]] = True
+        groups[key] = (body, m)
+    cp = LAYOUT["compass"]
+    groups["compass"] = ("sun", placed(s["compass"][0], cp["cx"], cp["cy"]))
+    b = LAYOUT["battery"]
+    groups["plaque"] = ("moon", alpha_mask(s["plaque"], b["x"], b["y"]))
+    return groups
+
+
+def covered(mask, body, a):
+    x, y = body_xy(body, a)
+    disc = alpha_mask(SKY_DISC, x, y)
+    return (mask & disc).sum() / SKY_DISC_AREA
+
+
+SKY_DISC = sun_sprite()
+SKY_DISC_AREA = int((np.array(SKY_DISC)[:, :, 3] > 0).sum())
+
+
+def glow(mask, e, body, a):
+    """Light leaking around the edges of mask from the body at a degrees,
+    brighter nearer the body and stronger the more of it is hidden. Worked
+    out per game pixel so it stays blocky, then trimmed off the mask."""
+    h = covered(mask, body, a)
+    if h <= 0:
+        return None
+    bx, by = track(body, a)
+    ys, xs = np.mgrid[0:SIZE, 0:SIZE]
+    gx, gy = (xs // P) * P + P / 2, (ys // P) * P + P / 2  # each pixel's game-pixel centre
+    eg = e[(gy).astype(int), (gx).astype(int)]
+    near = (1 - np.clip((np.hypot(gx - bx, gy - by) - BODY_HALF) / GLOW_REACH, 0, 1)) ** 0.6
+    if body == "sun":
+        # A short halo all round, with thin rays out to the full reach.
+        spike = np.maximum(0, np.cos(SUN_RAYS * np.arctan2(gy - by, gx - bx))) ** 3
+        reach = GLOW_W * (0.45 + 0.55 * spike)
+    else:
+        reach = GLOW_W * 0.7
+    rim = np.where(np.isfinite(eg), np.clip(1 - eg / (reach + 1), 0, 1), 0)
+    v = rim * near * min(1.0, h / 0.4)
+    level = np.ceil(v * 4 - 0.25).clip(0, 4).astype(int)
+    level[mask] = 0
+    if not level.any():
+        return None
+    out = np.zeros((SIZE, SIZE, 4), np.uint8)
+    for n, col in zip((4, 3, 2, 1), LIGHT[body]):
+        sel = level == n
+        out[sel, :3] = col
+        out[sel, 3] = GLOW_ALPHA[n]
+    img = Image.fromarray(out)
+    box = img.getbbox()
+    return img.crop(box), box[0], box[1]
+
+
+def build_sky(s):
+    """Glow frames for each occluder over the stretch of track where it hides
+    part of the body, and their positions for the face."""
+    sky = LAYOUT["sky"]
+    sky.update({"cx": CENTER, "cy": CENTER, "r": TRACK_R, "half": BODY_HALF, "glows": {}})
+    s["glows"] = {}
+    for key, (body, mask) in occluders(s).items():
+        hidden = [a / 4 for a in range(0, 721) if covered(mask, body, a / 4) > 0]
+        a0, a1 = hidden[0], hidden[-1]
+        e = edge_distance(mask)
+        frames, imgs = [], []
+        for i in range(GLOW_FRAMES):
+            g = glow(mask, e, body, a0 + (a1 - a0) * i / (GLOW_FRAMES - 1))
+            if g is None:
+                frames.append(None)
+                imgs.append(None)
+                continue
+            img, x, y = g
+            save(img, f"glow/{key}/{i}.png")
+            frames.append([x, y])
+            imgs.append((img, x, y))
+        sky["glows"][key] = {"body": body, "a0": a0, "a1": a1, "frames": frames}
+        s["glows"][key] = imgs
+
+
+def glow_frame(g, a):
+    """The glow frame index for a degrees along the track, or None outside
+    the occluder's stretch. watchface/index.js picks frames the same way."""
+    if not g["a0"] <= a <= g["a1"]:
+        return None
+    return js_round((a - g["a0"]) / (g["a1"] - g["a0"]) * (GLOW_FRAMES - 1))
+
+
 # ---------------------------------------------------------------- output
 
 SIZES = {}  # every saved image's [w, h], keyed by its path on the watch
@@ -369,6 +642,12 @@ def build_sprites():
     s["green"]["°"] = save(small("°", GREEN), "green/degree.png")
     s["white"]["%"] = save(small("%", WHITE), "white/percent.png")
     s["cream"]["-"] = save(small("-", CREAM), "cream/dash.png")
+    for name, color in (("gold", GOLD), ("dusk", DUSK)):
+        s[name] = {d: save(small(d, color), f"{name}/{d}.png") for d in "0123456789"}
+        s[name][":"] = save(small(":", color), f"{name}/colon.png")
+    s["horizon"] = {k: save(horizon_icon(k), f"sky/{k}.png") for k in ("rise", "set")}
+    s["sun"] = save(sun_sprite(), "sky/sun.png")
+    s["moon"] = [save(im, f"sky/moon/{i}.png") for i, im in enumerate(moon_phases())]
     days = ["Mon,", "Tue,", "Wed,", "Thu,", "Fri,", "Sat,", "Sun,"]
     s["week"] = [save(small(d, CREAM), f"week/{i}.png") for i, d in enumerate(days)]
     s["am"] = save(small("am", CREAM), "ampm/am.png")
@@ -386,13 +665,23 @@ def build_sprites():
 
 
 def build_background(s):
+    """The background, plus copies of the parts baked into it that the sun
+    and moon pass behind (plates, the globe, the battery plaque), which the
+    face lays back over them."""
     bg = stones()
     disc(bg)
-    for p in LAYOUT["plates"].values():
-        bg.alpha_composite(slab(p["w"] // P, PLATE_H), (p["x"], p["y"]))
-    put_orb(bg, "globe", s["globe"])
-    bat = battery_plaque(s)
-    bg.alpha_composite(bat, (LAYOUT["battery"]["x"], LAYOUT["battery"]["y"]))
+    over = []
+    for key, p in LAYOUT["plates"].items():
+        over.append((save(slab(p["w"] // P, PLATE_H), f"over/plate_{key}.png"), p["x"], p["y"]))
+    g, o = s["globe"], LAYOUT["orbs"]["globe"]
+    over.append((save(g, "over/globe.png"), int(o["cx"] - g.width / 2), int(o["cy"] - g.height / 2)))
+    s["plaque"] = battery_plaque(s)
+    over.append((save(s["plaque"], "over/plaque.png"), LAYOUT["battery"]["x"], LAYOUT["battery"]["y"]))
+    for im, x, y in over:
+        bg.alpha_composite(im, (x, y))
+    s["over"] = over
+    names = [f"plate_{k}" for k in LAYOUT["plates"]] + ["globe", "plaque"]
+    LAYOUT["sky"]["over"] = [[f"images/over/{n}.png", x, y] for n, (_, x, y) in zip(names, over)]
     return save(bg, "bg.png")
 
 
@@ -430,22 +719,45 @@ def place_text(canvas, parts, x, y):
     return x
 
 
-def mockup(bg, s):
+def draw_sky(m, s, sky):
+    """The sun or moon at sky["a"] degrees along its track, with the glows,
+    the overlays it hides behind and the sunrise and sunset times, layered
+    as the face layers them."""
+    body = sky["body"]
+    for key, g in LAYOUT["sky"]["glows"].items():
+        i = glow_frame(g, sky["a"]) if g["body"] == body else None
+        if i is not None and s["glows"][key][i]:
+            img, x, y = s["glows"][key][i]
+            m.alpha_composite(img, (x, y))
+    im = s["sun"] if body == "sun" else s["moon"][sky["phase"]]
+    m.alpha_composite(im, body_xy(body, sky["a"]))
+    for im, x, y in s["over"]:
+        m.alpha_composite(im, (x, y))
+    for key, font in (("rise", s["gold"]), ("set", s["dusk"])):
+        box, parts = LAYOUT["sky"][key], [font[ch] for ch in sky[key]]
+        x = box["x"] + box["w"] - row_width(parts) if box["align"] == "right" else box["x"]
+        place_text(m, parts, x, box["y"])
+        m.alpha_composite(s["horizon"][key], tuple(box["icon"]))
+
+
+def mockup(bg, s, clock=("1", "52", "pm"), sky=None):
     m = bg.copy()
+    if sky:
+        draw_sky(m, s, sky)
     # The block is centred for a two-digit hour; the hour is right-aligned
     # against the colon so the colon and minutes never move.
     b = s["big"]
-    pm = s["pm"]
+    ampm = s[clock[2]]
     digit_w, colon_w, gap = b["0"].width, b[":"].width, 2 * P
     t = LAYOUT["time"]
-    t["hour_x"] = int(CENTER - (4 * digit_w + colon_w + gap + pm.width) / 2)
+    t["hour_x"] = int(CENTER - (4 * digit_w + colon_w + gap + s["pm"].width) / 2)
     t["colon_x"] = t["hour_x"] + 2 * digit_w
     t["minute_x"] = t["colon_x"] + colon_w
     t["ampm_x"] = t["minute_x"] + 2 * digit_w + gap
     t["ampm_y"] = t["y"] + BIG_BASELINE - SMALL_BASELINE
-    place_text(m, [b["1"]], t["colon_x"] - digit_w, t["y"])
-    place_text(m, [b[":"], b["5"], b["2"]], t["colon_x"], t["y"])
-    m.alpha_composite(pm, (t["ampm_x"], t["ampm_y"]))
+    place_text(m, [b[d] for d in clock[0]], t["colon_x"] - digit_w * len(clock[0]), t["y"])
+    place_text(m, [b[":"]] + [b[d] for d in clock[1]], t["colon_x"], t["y"])
+    m.alpha_composite(ampm, (t["ampm_x"], t["ampm_y"]))
 
     c = s["cream"]
     day = s["week"][4]
@@ -479,20 +791,61 @@ def mockup(bg, s):
     return m
 
 
-def main():
-    check_fit()
-    s = build_sprites()
-    bg = build_background(s)
-    m = mockup(bg, s)
+def sky_at(minute, rise, sunset, next_rise, phase):
+    """Where the sun or moon is at a minute of the day; the face's drawSky()
+    works it out the same way."""
+    if rise <= minute < sunset:
+        return {"body": "sun", "a": 180 * (minute - rise) / (sunset - rise)}
+    start, end = (sunset, next_rise + 1440) if minute >= sunset else (sunset - 1440, rise)
+    return {"body": "moon", "a": 180 * (minute - start) / (end - start), "phase": phase}
+
+
+def hm12(minute):
+    h, mm = divmod(minute, 60)
+    return f"{(h % 12) or 12}:{mm:02d}"
+
+
+# Mockup day: sunrise 7:02, sunset 5:41 pm, a last-quarter moon.
+MOCK_SUN = (422, 1061, 423)
+MOCK_PHASE = 6
+
+
+def mock_sky(minute):
+    sky = sky_at(minute, *MOCK_SUN, MOCK_PHASE)
+    sky.update(rise=hm12(MOCK_SUN[0]), set=hm12(MOCK_SUN[1]))
+    return sky
+
+
+def on_screen(m):
     screen = Image.new("L", m.size, 0)
     sp = screen.load()
     for y in range(SIZE):
         for x in range(SIZE):
             if math.hypot(x + 0.5 - CENTER, y + 0.5 - CENTER) <= CENTER:
                 sp[x, y] = 255
-    shown = Image.composite(m, Image.new("RGBA", m.size, BLACK), screen)
+    return Image.composite(m, Image.new("RGBA", m.size, BLACK), screen)
+
+
+def clock_of(minute):
+    h, mm = divmod(minute, 60)
+    return str((h % 12) or 12), f"{mm:02d}", "am" if h < 12 else "pm"
+
+
+def main():
+    check_fit()
+    s = build_sprites()
+    bg = build_background(s)
+    build_sky(s)
+    shown = on_screen(mockup(bg, s, sky=mock_sky(13 * 60 + 52)))
     shown.convert("RGB").save(ROOT / "art" / "mockup.png")
     save(shown.resize((PREVIEW, PREVIEW), Image.LANCZOS), "preview.png")
+    # Morning, behind the HP orb, behind the compass, evening, behind the plaque, before dawn.
+    times = [8 * 60 + 30, 9 * 60 + 42, 12 * 60 + 21, 19 * 60 + 10, 21, 5 * 60 + 40]
+    sheet = Image.new("RGB", (SIZE * 3, SIZE * 2), (40, 40, 40))
+    for i, minute in enumerate(times):
+        frame = on_screen(mockup(bg, s, clock=clock_of(minute), sky=mock_sky(minute)))
+        sheet.paste(frame.convert("RGB"), ((i % 3) * SIZE, (i // 3) * SIZE))
+    sheet.save(ROOT / "art" / "sky_states.png")
     write_layout()
 
 
@@ -500,7 +853,8 @@ PREVIEW = 314  # the Active 2's watch face preview size
 
 
 def write_layout():
-    consts = {"SIZE": SIZE, "CENTER": CENTER, "FILL_STEPS": FILL_STEPS, "COMPASS_STEPS": COMPASS_STEPS}
+    consts = {"SIZE": SIZE, "CENTER": CENTER, "FILL_STEPS": FILL_STEPS, "COMPASS_STEPS": COMPASS_STEPS,
+              "MOON_PHASES": MOON_PHASES}
     lines = ["// Generated by art/make_art.py; edit that, not this.", ""]
     lines += [f"export const {k} = {json.dumps(v)}" for k, v in consts.items()]
     lines += [f"export const LAYOUT = {json.dumps(LAYOUT, indent=2)}", "",

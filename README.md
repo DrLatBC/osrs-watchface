@@ -16,6 +16,14 @@ installed through Gadgetbridge. Personal use only; not published anywhere.
   left out if the watch won't give a face the compass. While awake it runs at the
   high report rate and is also polled every 200 ms; an uncalibrated compass
   ('INVALID') holds the last heading.
+- **Sun and moon** ride the ring: the sun from sunrise at the 9 o'clock joint over
+  the top to sunset at 3, the moon through the night along the bottom, each at the
+  pace of that day's daylight or darkness. Whatever they pass behind (an orb and
+  its plate, the compass, the potion plaque) lights up around its edges, gold for
+  the sun and silver for the moon. The moon shows its phase, worked out from the
+  date. Sunrise (gold, up arrow) and sunset (orange, down arrow) times sit outside
+  the 9 and 3 joints under a horizon icon. Times come from
+  the weather forecast (today's and tomorrow's sunrise); without one the sky is empty.
 - **Time** in the OSRS Bold-12 font, everything else in Plain-11. 12h shows am/pm
   with no leading zero; 24h is zero-padded.
 - **Always-on**: time and date only, on black.
@@ -41,7 +49,8 @@ Active 2 Round values are in `app.json`). Don't use the Zepp app.
 ## Layout
 
 - `art/make_art.py` draws everything: stonework, ring, plates, orb fill levels,
-  compass dials, digit images. It writes `watchface/layout.js` (positions and every
+  compass dials, digit images, the sun, moon phases and every glow frame (and
+  `art/sky_states.png`, the sky at six times of day). It writes `watchface/layout.js` (positions and every
   image size), so the mockup and the watch share one set of numbers.
 - `art/osrs_font.py` renders the RuneStar font dumps in `art/fonts` (CC0).
 - `art/sprites` holds the OSRS Wiki sprites.
@@ -60,5 +69,10 @@ Active 2 Round values are in `app.json`). Don't use the Zepp app.
   back to `getLastFewHour()` and `getLastDay()`.
 - `IMG_CLICK` with a `data_type` opens that system app on a tap; it needs a `src`,
   so the globe's tap area is a transparent `images/tap/globe.png`.
+- Widgets layer in creation order. The sun and moon go in before everything they
+  pass behind, and the parts of `bg.png` they pass behind (plates, globe, plaque)
+  are laid back over them from `images/over/`.
+- `Weather.getForecast().tideData.data[i]` holds day i's sunrise and sunset as
+  `{hour, minute}`; the face takes index 0 as today.
 - Image digits need fixed-width cells, and an `IMG` can't be scaled: its w/h must
   match the file.

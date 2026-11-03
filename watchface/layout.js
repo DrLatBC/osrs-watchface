@@ -4,6 +4,7 @@ export const SIZE = 466
 export const CENTER = 233.0
 export const FILL_STEPS = 20
 export const COMPASS_STEPS = 36
+export const MOON_PHASES = 8
 export const LAYOUT = {
   "plates": {
     "hp": {
@@ -108,6 +109,360 @@ export const LAYOUT = {
       "y": 297,
       "w": 140,
       "h": 68
+    }
+  },
+  "sky": {
+    "rise": {
+      "x": 8,
+      "y": 224,
+      "w": 50,
+      "align": "right",
+      "icon": [
+        19,
+        196
+      ]
+    },
+    "set": {
+      "x": 408,
+      "y": 224,
+      "w": 50,
+      "align": "left",
+      "icon": [
+        419,
+        196
+      ]
+    },
+    "over": [
+      [
+        "images/over/plate_hp.png",
+        50,
+        116
+      ],
+      [
+        "images/over/plate_prayer.png",
+        324,
+        116
+      ],
+      [
+        "images/over/plate_run.png",
+        22,
+        312
+      ],
+      [
+        "images/over/plate_globe.png",
+        324,
+        312
+      ],
+      [
+        "images/over/globe.png",
+        294,
+        301
+      ],
+      [
+        "images/over/plaque.png",
+        158,
+        352
+      ]
+    ],
+    "cx": 233.0,
+    "cy": 233.0,
+    "r": 160.0,
+    "half": 17,
+    "glows": {
+      "hp": {
+        "body": "sun",
+        "a0": 23.0,
+        "a1": 64.5,
+        "frames": [
+          null,
+          [
+            38,
+            96
+          ],
+          [
+            36,
+            92
+          ],
+          [
+            36,
+            90
+          ],
+          [
+            38,
+            88
+          ],
+          [
+            38,
+            88
+          ],
+          [
+            38,
+            88
+          ],
+          [
+            42,
+            88
+          ],
+          [
+            50,
+            88
+          ],
+          [
+            60,
+            90
+          ],
+          [
+            74,
+            90
+          ],
+          null
+        ]
+      },
+      "prayer": {
+        "body": "sun",
+        "a0": 115.5,
+        "a1": 157.0,
+        "frames": [
+          null,
+          [
+            280,
+            90
+          ],
+          [
+            278,
+            90
+          ],
+          [
+            276,
+            88
+          ],
+          [
+            278,
+            88
+          ],
+          [
+            278,
+            88
+          ],
+          [
+            278,
+            88
+          ],
+          [
+            278,
+            88
+          ],
+          [
+            280,
+            90
+          ],
+          [
+            284,
+            92
+          ],
+          [
+            290,
+            96
+          ],
+          null
+        ]
+      },
+      "run": {
+        "body": "moon",
+        "a0": 115.5,
+        "a1": 157.0,
+        "frames": [
+          null,
+          [
+            76,
+            294
+          ],
+          [
+            60,
+            288
+          ],
+          [
+            50,
+            288
+          ],
+          [
+            40,
+            288
+          ],
+          [
+            34,
+            288
+          ],
+          [
+            26,
+            288
+          ],
+          [
+            20,
+            288
+          ],
+          [
+            16,
+            288
+          ],
+          [
+            14,
+            288
+          ],
+          [
+            14,
+            288
+          ],
+          null
+        ]
+      },
+      "globe": {
+        "body": "moon",
+        "a0": 23.0,
+        "a1": 62.0,
+        "frames": [
+          null,
+          [
+            292,
+            292
+          ],
+          [
+            288,
+            292
+          ],
+          [
+            286,
+            292
+          ],
+          [
+            286,
+            292
+          ],
+          [
+            284,
+            292
+          ],
+          [
+            284,
+            292
+          ],
+          [
+            284,
+            292
+          ],
+          [
+            284,
+            292
+          ],
+          [
+            284,
+            292
+          ],
+          [
+            286,
+            294
+          ],
+          null
+        ]
+      },
+      "compass": {
+        "body": "sun",
+        "a0": 68.25,
+        "a1": 111.75,
+        "frames": [
+          null,
+          [
+            176,
+            22
+          ],
+          [
+            176,
+            18
+          ],
+          [
+            176,
+            18
+          ],
+          [
+            178,
+            18
+          ],
+          [
+            176,
+            16
+          ],
+          [
+            176,
+            16
+          ],
+          [
+            178,
+            18
+          ],
+          [
+            178,
+            18
+          ],
+          [
+            184,
+            18
+          ],
+          [
+            196,
+            22
+          ],
+          null
+        ]
+      },
+      "plaque": {
+        "body": "moon",
+        "a0": 56.0,
+        "a1": 124.0,
+        "frames": [
+          null,
+          [
+            222,
+            344
+          ],
+          [
+            208,
+            344
+          ],
+          [
+            192,
+            344
+          ],
+          [
+            178,
+            344
+          ],
+          [
+            156,
+            344
+          ],
+          [
+            152,
+            344
+          ],
+          [
+            150,
+            344
+          ],
+          [
+            150,
+            344
+          ],
+          [
+            150,
+            344
+          ],
+          [
+            150,
+            344
+          ],
+          null
+        ]
+      }
     }
   }
 }
@@ -355,6 +710,334 @@ export const SIZES = {
   ],
   "images/cream/dash.png": [
     12,
+    24
+  ],
+  "images/dusk/0.png": [
+    14,
+    24
+  ],
+  "images/dusk/1.png": [
+    14,
+    24
+  ],
+  "images/dusk/2.png": [
+    14,
+    24
+  ],
+  "images/dusk/3.png": [
+    14,
+    24
+  ],
+  "images/dusk/4.png": [
+    14,
+    24
+  ],
+  "images/dusk/5.png": [
+    14,
+    24
+  ],
+  "images/dusk/6.png": [
+    14,
+    24
+  ],
+  "images/dusk/7.png": [
+    14,
+    24
+  ],
+  "images/dusk/8.png": [
+    14,
+    24
+  ],
+  "images/dusk/9.png": [
+    14,
+    24
+  ],
+  "images/dusk/colon.png": [
+    8,
+    24
+  ],
+  "images/glow/compass/1.png": [
+    92,
+    104
+  ],
+  "images/glow/compass/10.png": [
+    92,
+    104
+  ],
+  "images/glow/compass/2.png": [
+    106,
+    110
+  ],
+  "images/glow/compass/3.png": [
+    110,
+    110
+  ],
+  "images/glow/compass/4.png": [
+    110,
+    110
+  ],
+  "images/glow/compass/5.png": [
+    112,
+    112
+  ],
+  "images/glow/compass/6.png": [
+    112,
+    112
+  ],
+  "images/glow/compass/7.png": [
+    110,
+    110
+  ],
+  "images/glow/compass/8.png": [
+    110,
+    110
+  ],
+  "images/glow/compass/9.png": [
+    104,
+    110
+  ],
+  "images/glow/globe/1.png": [
+    146,
+    76
+  ],
+  "images/glow/globe/10.png": [
+    112,
+    76
+  ],
+  "images/glow/globe/2.png": [
+    150,
+    78
+  ],
+  "images/glow/globe/3.png": [
+    152,
+    78
+  ],
+  "images/glow/globe/4.png": [
+    152,
+    78
+  ],
+  "images/glow/globe/5.png": [
+    152,
+    78
+  ],
+  "images/glow/globe/6.png": [
+    150,
+    78
+  ],
+  "images/glow/globe/7.png": [
+    144,
+    78
+  ],
+  "images/glow/globe/8.png": [
+    136,
+    78
+  ],
+  "images/glow/globe/9.png": [
+    128,
+    78
+  ],
+  "images/glow/hp/1.png": [
+    138,
+    84
+  ],
+  "images/glow/hp/10.png": [
+    112,
+    82
+  ],
+  "images/glow/hp/2.png": [
+    146,
+    86
+  ],
+  "images/glow/hp/3.png": [
+    150,
+    92
+  ],
+  "images/glow/hp/4.png": [
+    148,
+    92
+  ],
+  "images/glow/hp/5.png": [
+    150,
+    94
+  ],
+  "images/glow/hp/6.png": [
+    150,
+    94
+  ],
+  "images/glow/hp/7.png": [
+    146,
+    92
+  ],
+  "images/glow/hp/8.png": [
+    138,
+    92
+  ],
+  "images/glow/hp/9.png": [
+    128,
+    90
+  ],
+  "images/glow/plaque/1.png": [
+    92,
+    96
+  ],
+  "images/glow/plaque/10.png": [
+    94,
+    96
+  ],
+  "images/glow/plaque/2.png": [
+    108,
+    96
+  ],
+  "images/glow/plaque/3.png": [
+    122,
+    96
+  ],
+  "images/glow/plaque/4.png": [
+    136,
+    96
+  ],
+  "images/glow/plaque/5.png": [
+    158,
+    96
+  ],
+  "images/glow/plaque/6.png": [
+    156,
+    96
+  ],
+  "images/glow/plaque/7.png": [
+    138,
+    96
+  ],
+  "images/glow/plaque/8.png": [
+    124,
+    96
+  ],
+  "images/glow/plaque/9.png": [
+    108,
+    96
+  ],
+  "images/glow/prayer/1.png": [
+    112,
+    82
+  ],
+  "images/glow/prayer/10.png": [
+    138,
+    84
+  ],
+  "images/glow/prayer/2.png": [
+    128,
+    90
+  ],
+  "images/glow/prayer/3.png": [
+    140,
+    92
+  ],
+  "images/glow/prayer/4.png": [
+    144,
+    92
+  ],
+  "images/glow/prayer/5.png": [
+    148,
+    94
+  ],
+  "images/glow/prayer/6.png": [
+    150,
+    94
+  ],
+  "images/glow/prayer/7.png": [
+    150,
+    92
+  ],
+  "images/glow/prayer/8.png": [
+    148,
+    92
+  ],
+  "images/glow/prayer/9.png": [
+    144,
+    86
+  ],
+  "images/glow/run/1.png": [
+    106,
+    78
+  ],
+  "images/glow/run/10.png": [
+    162,
+    84
+  ],
+  "images/glow/run/2.png": [
+    124,
+    86
+  ],
+  "images/glow/run/3.png": [
+    134,
+    86
+  ],
+  "images/glow/run/4.png": [
+    144,
+    86
+  ],
+  "images/glow/run/5.png": [
+    150,
+    86
+  ],
+  "images/glow/run/6.png": [
+    158,
+    86
+  ],
+  "images/glow/run/7.png": [
+    164,
+    86
+  ],
+  "images/glow/run/8.png": [
+    168,
+    86
+  ],
+  "images/glow/run/9.png": [
+    168,
+    86
+  ],
+  "images/gold/0.png": [
+    14,
+    24
+  ],
+  "images/gold/1.png": [
+    14,
+    24
+  ],
+  "images/gold/2.png": [
+    14,
+    24
+  ],
+  "images/gold/3.png": [
+    14,
+    24
+  ],
+  "images/gold/4.png": [
+    14,
+    24
+  ],
+  "images/gold/5.png": [
+    14,
+    24
+  ],
+  "images/gold/6.png": [
+    14,
+    24
+  ],
+  "images/gold/7.png": [
+    14,
+    24
+  ],
+  "images/gold/8.png": [
+    14,
+    24
+  ],
+  "images/gold/9.png": [
+    14,
+    24
+  ],
+  "images/gold/colon.png": [
+    8,
     24
   ],
   "images/green/0.png": [
@@ -657,9 +1340,77 @@ export const SIZES = {
     68,
     68
   ],
+  "images/over/globe.png": [
+    60,
+    60
+  ],
+  "images/over/plaque.png": [
+    150,
+    82
+  ],
+  "images/over/plate_globe.png": [
+    106,
+    38
+  ],
+  "images/over/plate_hp.png": [
+    92,
+    38
+  ],
+  "images/over/plate_prayer.png": [
+    92,
+    38
+  ],
+  "images/over/plate_run.png": [
+    120,
+    38
+  ],
   "images/preview.png": [
     314,
     314
+  ],
+  "images/sky/moon/0.png": [
+    34,
+    34
+  ],
+  "images/sky/moon/1.png": [
+    34,
+    34
+  ],
+  "images/sky/moon/2.png": [
+    34,
+    34
+  ],
+  "images/sky/moon/3.png": [
+    34,
+    34
+  ],
+  "images/sky/moon/4.png": [
+    34,
+    34
+  ],
+  "images/sky/moon/5.png": [
+    34,
+    34
+  ],
+  "images/sky/moon/6.png": [
+    34,
+    34
+  ],
+  "images/sky/moon/7.png": [
+    34,
+    34
+  ],
+  "images/sky/rise.png": [
+    28,
+    26
+  ],
+  "images/sky/set.png": [
+    28,
+    26
+  ],
+  "images/sky/sun.png": [
+    34,
+    34
   ],
   "images/tap/globe.png": [
     140,

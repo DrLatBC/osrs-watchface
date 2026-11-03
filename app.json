@@ -5,8 +5,8 @@
     "appName": "OSRS",
     "appType": "watchface",
     "version": {
-      "code": 7,
-      "name": "1.0.6"
+      "code": 10,
+      "name": "1.0.9"
     },
     "icon": "images/preview.png",
     "vender": "drlatbc",
