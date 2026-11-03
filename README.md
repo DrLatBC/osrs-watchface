@@ -1,7 +1,11 @@
 # OSRS watch face
 
 An Old School RuneScape face for the Amazfit Active 2 (Round, 466x466, Zepp OS 4),
-installed through Gadgetbridge. Personal use only; not published anywhere.
+installed through Gadgetbridge. Free and non-commercial.
+
+> *Created using intellectual property belonging to Jagex Limited under the terms
+> of Jagex's [Fan Content Policy](https://legal.jagex.com/docs/policies/fan-content-policy).
+> This content is not endorsed by or affiliated with Jagex.*
 
 - **Orbs** (official in-game sprites) fill from the bottom in 5% steps:
   - HP: heart rate, measured live while the screen is on (the watch's last
